@@ -1,6 +1,7 @@
 import {
   addComponent,
   ContactShadows,
+  loadPMREM,
   onStart,
   OrbitControls,
   WebXR,
@@ -11,7 +12,10 @@ import { ProductApp } from "./scripts/ProductApp.js";
 
 onStart((context) => {
   const scene = context.scene;
-  context.mainCamera.position.set(0.55, 0.42, 0.85);
+  const camera = context.mainCamera as THREE.PerspectiveCamera;
+  camera.fov = 38;
+  camera.position.set(0.48, 0.32, 0.82);
+  camera.updateProjectionMatrix();
   context.menu.showFullscreenOption(false);
   context.menu.showQRCodeButton(false);
 
@@ -27,23 +31,32 @@ onStart((context) => {
 
   void (async () => {
     try {
+      try {
+        const envTex = await loadPMREM("https://cloud.needle.tools/hdris/studio.ktx2", context.renderer);
+        if (envTex) scene.environment = envTex;
+      } catch {
+        // Studio lighting still works without the HDRI.
+      }
+
       const product = await loadUnityProduct();
       scene.add(product.root);
 
       const shadows = ContactShadows.auto(context);
-      shadows.darkness = 0.75;
-      shadows.opacity = 0.85;
-      shadows.fitShadows({ object: product.root, positionOffset: { y: 0.01 } });
+      shadows.darkness = 0.55;
+      shadows.opacity = 0.65;
+      shadows.fitShadows({ object: product.machine, positionOffset: { y: 0.005 } });
 
       const orbit = addComponent(scene, OrbitControls);
       orbit.enablePan = true;
       orbit.fitCamera({
-        objects: product.root,
+        objects: product.machine,
         immediate: true,
-        fitOffset: 1.2,
-        fitDirection: { x: 0.55, y: 0.28, z: 1 },
-        fov: 42,
+        fitOffset: 1.45,
+        fitDirection: { x: -0.55, y: -0.28, z: -1 },
+        fov: 38,
       });
+      camera.fov = 38;
+      camera.updateProjectionMatrix();
 
       const webxr = addComponent(scene, WebXR, {
         createARButton: false,

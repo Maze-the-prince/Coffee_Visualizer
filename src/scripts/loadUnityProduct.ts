@@ -31,14 +31,12 @@ function isStudioProp(name: string) {
   return lower === "table" || lower === "tabletop" || lower.startsWith("table");
 }
 
-function hideStudioProps(root: THREE.Object3D) {
+function stripStudioProps(root: THREE.Object3D) {
+  const remove: THREE.Object3D[] = [];
   root.traverse((child) => {
-    if (!isStudioProp(child.name)) return;
-    child.visible = false;
-    child.traverse((nested) => {
-      nested.visible = false;
-    });
+    if (isStudioProp(child.name)) remove.push(child);
   });
+  for (const child of remove) child.removeFromParent();
 }
 
 function hasHiddenAncestor(object: THREE.Object3D) {
@@ -103,13 +101,17 @@ function styleUnityMaterials(root: THREE.Object3D) {
   const body = new THREE.MeshStandardMaterial({ color: 0xc4162e, metalness: 0.22, roughness: 0.32, envMapIntensity: 1.2 });
   const black = new THREE.MeshStandardMaterial({ color: 0x0a0a0b, metalness: 0.18, roughness: 0.22, envMapIntensity: 1 });
   const chrome = new THREE.MeshStandardMaterial({ color: 0xd1d5d8, metalness: 1, roughness: 0.08, envMapIntensity: 1.4 });
-  const glass = new THREE.MeshStandardMaterial({
-    color: 0xb8dbea,
-    metalness: 0.05,
-    roughness: 0.08,
+  const glass = new THREE.MeshPhysicalMaterial({
+    color: 0xd7eef5,
+    metalness: 0,
+    roughness: 0.06,
+    transmission: 0.9,
+    thickness: 0.012,
+    ior: 1.45,
     transparent: true,
-    opacity: 0.28,
+    opacity: 1,
     envMapIntensity: 1.2,
+    depthWrite: false,
   });
   const ceramic = new THREE.MeshStandardMaterial({ color: 0xf3f1ea, metalness: 0.04, roughness: 0.55 });
 
@@ -208,7 +210,7 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
 
   source.name = source.name || "UnityProduct";
   root.add(source);
-  hideStudioProps(root);
+  stripStudioProps(root);
   styleUnityMaterials(root);
   fitRoot(root);
 

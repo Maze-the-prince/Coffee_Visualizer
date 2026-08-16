@@ -10,17 +10,23 @@
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
-    <needle-engine background-color="#141518"></needle-engine>
+    <needle-engine background-color="#141518" camera-controls="0"></needle-engine>
 
     <div id="hud">
-      <button type="button" id="btn-water">Water Replace</button>
-      <button type="button" id="btn-ar" class="primary">AR</button>
-      <button type="button" id="btn-one">One Shot</button>
-      <button type="button" id="btn-two">Two Shot</button>
-      <button type="button" id="btn-spin">Spin</button>
-      <button type="button" id="btn-labels">Labels</button>
-      <button type="button" id="btn-smaller">−</button>
-      <button type="button" id="btn-bigger">+</button>
+      <div class="hud-top">
+        <button type="button" id="btn-one">One Shot</button>
+        <button type="button" id="btn-ar" class="primary">AR</button>
+        <button type="button" id="btn-water">Water Replace</button>
+        <button type="button" id="btn-two">Two Shot</button>
+      </div>
+      <div class="hud-bottom">
+        <div class="hud-scale">
+          <button type="button" id="btn-smaller">−</button>
+          <button type="button" id="btn-bigger">+</button>
+        </div>
+        <button type="button" id="btn-spin">Spin</button>
+        <button type="button" id="btn-labels">Labels</button>
+      </div>
     </div>
     <p id="hint">Orbit to inspect · tap AR to place on a table</p>
     <p id="scale-label"></p>
