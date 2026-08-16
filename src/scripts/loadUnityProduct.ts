@@ -57,6 +57,11 @@ function attachLabel(parent: THREE.Object3D | undefined, title: string, fallback
   return sprite;
 }
 
+function isStudioProp(name: string) {
+  const lower = name.toLowerCase();
+  return lower === "table" || lower === "tabletop";
+}
+
 function styleUnityMaterials(root: THREE.Object3D) {
   const body = new THREE.MeshStandardMaterial({ color: 0xc4162e, metalness: 0.22, roughness: 0.32, envMapIntensity: 1.2 });
   const black = new THREE.MeshStandardMaterial({ color: 0x0a0a0b, metalness: 0.18, roughness: 0.22, envMapIntensity: 1 });
@@ -70,29 +75,35 @@ function styleUnityMaterials(root: THREE.Object3D) {
     envMapIntensity: 1.2,
   });
   const ceramic = new THREE.MeshStandardMaterial({ color: 0xf3f1ea, metalness: 0.04, roughness: 0.55 });
-  const stone = new THREE.MeshStandardMaterial({ color: 0x8a8680, metalness: 0.08, roughness: 0.62 });
-  const wood = new THREE.MeshStandardMaterial({ color: 0xbc9f8e, metalness: 0.04, roughness: 0.7 });
 
   root.traverse((child) => {
     const mesh = child as THREE.Mesh;
     if (!mesh.isMesh) return;
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    const name = mesh.name;
-    const lower = name.toLowerCase();
+    const lower = mesh.name.toLowerCase();
+    if (isStudioProp(mesh.name)) {
+      mesh.visible = false;
+      return;
+    }
     if (lower.includes("handlegrinder") || lower.includes("traytop") || lower === "dial" || lower.includes("pointer")) mesh.material = black;
-    else if (lower.includes("trayhandle") || lower === "rim" || lower.includes("switch_")) mesh.material = chrome;
-    else if (lower.includes("glass") || lower.includes("watertray") || lower.includes("water")) mesh.material = glass;
+    else if (lower.includes("trayhandle") || lower === "rim" || lower.includes("switch")) mesh.material = chrome;
+    else if (lower.includes("glass") || lower.includes("watertray")) mesh.material = glass;
     else if (lower === "cup" || lower.includes("mug")) mesh.material = ceramic;
-    else if (lower.includes("tabletop")) mesh.material = stone;
-    else if (lower === "table") mesh.material = wood;
-    else if (lower.includes("coffeemachine") || lower.includes("trayfront") || lower.includes("body")) mesh.material = body;
+    else mesh.material = body;
   });
 }
 
 function fitRoot(root: THREE.Group) {
   root.updateMatrixWorld(true);
-  const box = new THREE.Box3().setFromObject(root);
+  const box = new THREE.Box3();
+  root.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.visible || isStudioProp(mesh.name)) return;
+    box.expandByObject(mesh);
+  });
+  if (box.isEmpty()) box.setFromObject(root);
+
   const size = new THREE.Vector3();
   const center = new THREE.Vector3();
   box.getSize(size);
@@ -153,8 +164,8 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
   const labels = new THREE.Group();
   labels.name = "Labels";
   labels.visible = false;
-  attachLabel(findNamed(root, "Switch_OneShot"), "One Shot", machine, new THREE.Vector3(0, 0.08, 0.05));
-  attachLabel(findNamed(root, "Switch_TwoShot"), "Two Shot", machine, new THREE.Vector3(0, 0.08, 0.05));
+  attachLabel(findNamed(root, "Switch_OneShot") ?? findNamed(root, "SwitchB"), "One Shot", machine, new THREE.Vector3(0, 0.08, 0.05));
+  attachLabel(findNamed(root, "Switch_TwoShot") ?? findNamed(root, "SwitchC"), "Two Shot", machine, new THREE.Vector3(0, 0.08, 0.05));
   attachLabel(findNamed(root, "Switch_Power"), "Power", machine, new THREE.Vector3(0.05, 0.08, 0));
   attachLabel(portafilter, "Portafilter", machine, new THREE.Vector3(0, 0.05, 0.08));
   attachLabel(mug, "Coffee Mug", machine, new THREE.Vector3(0, 0.08, 0));
