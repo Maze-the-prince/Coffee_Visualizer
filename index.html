@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#111214" />
+    <title>Coffee Maker WebAR</title>
+    <meta name="description" content="Place the espresso machine on your table in the browser with Needle Engine WebAR." />
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <needle-engine background-color="#141518"></needle-engine>
+
+    <div id="hud">
+      <button type="button" id="btn-water">Water Replace</button>
+      <button type="button" id="btn-ar" class="primary">AR</button>
+      <button type="button" id="btn-one">One Shot</button>
+      <button type="button" id="btn-two">Two Shot</button>
+      <button type="button" id="btn-spin">Spin</button>
+      <button type="button" id="btn-labels">Labels</button>
+      <button type="button" id="btn-smaller">−</button>
+      <button type="button" id="btn-bigger">+</button>
+    </div>
+    <p id="hint">Orbit to inspect · tap AR to place on a table</p>
+    <p id="scale-label"></p>
+
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
