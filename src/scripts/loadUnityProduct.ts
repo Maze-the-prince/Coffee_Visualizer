@@ -16,6 +16,7 @@ export type CoffeeMakerParts = {
   oneShot: THREE.Object3D;
   twoShot: THREE.Object3D;
   power: THREE.Object3D;
+  dial: THREE.Object3D;
   labels: THREE.Group;
   studio: THREE.Group;
 };
@@ -38,20 +39,36 @@ function isStudioProp(name: string) {
   return lower === "table" || lower === "tabletop" || lower.startsWith("table");
 }
 
+const LABEL_OFFSETS: Record<string, [number, number, number]> = {
+  Power: [0.34, 0.12, 0.12],
+  "One Shot": [-0.18, 0.08, 0.16],
+  "Two Shot": [0.18, 0.08, 0.16],
+  Grinder: [0.28, 0.06, 0.08],
+  "Temp Control": [-0.22, 0.08, 0.06],
+  "Water Tray": [-0.08, 0.04, -0.2],
+  Tray: [0.02, -0.04, 0.18],
+  "Coffee Mug": [0.12, 0.1, 0.06],
+};
+
+function mirrorXToMatchUnity(root: THREE.Object3D) {
+  const mirror = new THREE.Matrix4().makeScale(-1, 1, 1);
+  root.traverse((child) => {
+    child.position.x *= -1;
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.geometry) return;
+    mesh.geometry.applyMatrix4(mirror);
+  });
+}
+
 function attachLabel(labels: THREE.Group, host: THREE.Object3D | undefined, title: string, fallback: THREE.Object3D, root: THREE.Group) {
   const anchor = new THREE.Object3D();
   anchor.name = `Label_${title}`;
   const target = host ?? fallback;
   target.updateWorldMatrix(true, true);
-  const box = new THREE.Box3().setFromObject(target);
   const world = new THREE.Vector3();
-  if (box.isEmpty()) {
-    target.getWorldPosition(world);
-    world.y += 0.05;
-  } else {
-    box.getCenter(world);
-    world.y = box.max.y + 0.025;
-  }
+  target.getWorldPosition(world);
+  const offset = LABEL_OFFSETS[title] ?? [0, 0.08, 0];
+  world.add(new THREE.Vector3(offset[0], offset[1], offset[2]).applyQuaternion(root.quaternion));
   root.worldToLocal(world);
   anchor.position.copy(world);
   labels.add(anchor);
@@ -378,6 +395,7 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
 
   source.name = source.name || "UnityProduct";
   root.add(source);
+  mirrorXToMatchUnity(root);
   styleUnityMaterials(root);
   fitRoot(root);
   seatOnTable(root);
@@ -387,6 +405,7 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
   const waterTank = findNamed(root, "WaterTray") ?? findNamed(root, "Glass") ?? machine;
   const portafilter = findNamed(root, "HandleGrinder") ?? machine;
   const tray = findNamed(root, "TrayTop") ?? findNamed(root, "TrayFront") ?? machine;
+  const trayFront = findNamed(root, "TrayFront") ?? tray;
   const oneShot = findNamed(root, "Switch_OneShot") ?? findNamed(root, "SwitchB") ?? machine;
   const twoShot = findNamed(root, "Switch_TwoShot") ?? findNamed(root, "SwitchC") ?? machine;
   const power = findNamed(root, "Switch_Power") ?? machine;
@@ -407,8 +426,8 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
   attachLabel(labels, portafilter, "Grinder", machine, root);
   attachLabel(labels, dial, "Temp Control", machine, root);
   attachLabel(labels, waterTank, "Water Tray", machine, root);
-  attachLabel(labels, tray, "Tray", machine, root);
+  attachLabel(labels, trayFront, "Tray", machine, root);
   attachLabel(labels, mug, "Coffee Mug", machine, root);
 
-  return { root, machine, mug, waterTank, portafilter, tray, oneShot, twoShot, power, labels, studio };
+  return { root, machine, mug, waterTank, portafilter, tray, oneShot, twoShot, power, dial, labels, studio };
 }

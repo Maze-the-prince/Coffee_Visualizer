@@ -14,6 +14,43 @@ function localPositionAlongAxis(object: THREE.Object3D, localAxis: THREE.Vector3
   return object.parent.worldToLocal(world);
 }
 
+function partKey(object: THREE.Object3D | null): string {
+  while (object) {
+    const name = object.name.toLowerCase();
+    if (
+      name === "switchb" ||
+      name === "switchc" ||
+      name === "switch_oneshot" ||
+      name === "switch_twoshot" ||
+      name === "switch_power" ||
+      name === "handlegrinder" ||
+      name === "traytop" ||
+      name === "trayfront" ||
+      name === "trayfront001" ||
+      name === "trayhandle" ||
+      name === "cup" ||
+      name === "dial" ||
+      name === "watertray"
+    ) {
+      return name;
+    }
+    object = object.parent;
+  }
+  return "";
+}
+
+function addTapProxy(target: THREE.Object3D, worldRadius: number) {
+  const scale = new THREE.Vector3();
+  target.getWorldScale(scale);
+  const radius = worldRadius / Math.max(Math.abs(scale.x), 1e-8);
+  const proxy = new THREE.Mesh(
+    new THREE.SphereGeometry(radius, 10, 10),
+    new THREE.MeshBasicMaterial({ visible: false, depthWrite: false })
+  );
+  proxy.name = `${target.name}_hit`;
+  target.add(proxy);
+}
+
 function setPressed(id: string, pressed: boolean) {
   document.getElementById(id)?.setAttribute("aria-pressed", pressed ? "true" : "false");
 }
@@ -33,6 +70,8 @@ export class ProductApp extends Behaviour {
   private waterOut = false;
   private handleOut = false;
   private trayOut = false;
+  private mugOut = false;
+  private dialTurned = false;
   private pourTime = 0;
   private pourMesh?: THREE.Mesh;
   private userScale = 1;
@@ -42,6 +81,9 @@ export class ProductApp extends Behaviour {
   private handleHome = new THREE.Euler();
   private trayHome = new THREE.Vector3();
   private trayOutPos = new THREE.Vector3();
+  private mugHome = new THREE.Vector3();
+  private mugOutPos = new THREE.Vector3();
+  private dialHome = 0;
   private hint?: HTMLElement;
   private scaleLabel?: HTMLElement;
   private arButton?: HTMLButtonElement;
@@ -69,10 +111,17 @@ export class ProductApp extends Behaviour {
     if (!this.parts || this.pourMesh) return;
     this.fittedScale.copy(this.parts.root.scale);
     this.waterHome.copy(this.parts.waterTank.position);
-    this.waterOutPos.copy(localPositionAlongAxis(this.parts.waterTank, new THREE.Vector3(0, 0, -1), 0.1));
+    this.waterOutPos.copy(localPositionAlongAxis(this.parts.waterTank, new THREE.Vector3(0, 0, -1), 0.16));
     this.handleHome.copy(this.parts.portafilter.rotation);
     this.trayHome.copy(this.parts.tray.position);
-    this.trayOutPos.copy(localPositionAlongAxis(this.parts.tray, new THREE.Vector3(0, 0, 1), 0.07));
+    this.trayOutPos.copy(localPositionAlongAxis(this.parts.tray, new THREE.Vector3(0, 0, 1), 0.09));
+    this.mugHome.copy(this.parts.mug.position);
+    this.mugOutPos.copy(localPositionAlongAxis(this.parts.mug, new THREE.Vector3(0, 1, 0), 0.04));
+    this.dialHome = this.parts.dial.rotation.x;
+    if (this.parts.oneShot !== this.parts.machine) addTapProxy(this.parts.oneShot, 0.028);
+    if (this.parts.twoShot !== this.parts.machine) addTapProxy(this.parts.twoShot, 0.028);
+    if (this.parts.power !== this.parts.machine) addTapProxy(this.parts.power, 0.028);
+    if (this.parts.dial !== this.parts.machine) addTapProxy(this.parts.dial, 0.03);
     this.createPour();
     this.bindModelClicks();
   }
@@ -87,10 +136,14 @@ export class ProductApp extends Behaviour {
     const dt = Math.min(this.context.time.deltaTime * 2.4, 1);
     this.parts.waterTank.position.lerp(this.waterOut ? this.waterOutPos : this.waterHome, dt);
 
-    const handleTarget = this.handleHome.y + (this.handleOut ? -0.55 : 0);
+    const handleTarget = this.handleHome.y + (this.handleOut ? THREE.MathUtils.degToRad(25) : 0);
     this.parts.portafilter.rotation.y = THREE.MathUtils.lerp(this.parts.portafilter.rotation.y, handleTarget, dt);
 
     this.parts.tray.position.lerp(this.trayOut ? this.trayOutPos : this.trayHome, dt);
+    this.parts.mug.position.lerp(this.mugOut ? this.mugOutPos : this.mugHome, dt);
+
+    const dialTarget = this.dialHome + (this.dialTurned ? Math.PI * 0.5 : 0);
+    this.parts.dial.rotation.x = THREE.MathUtils.lerp(this.parts.dial.rotation.x, dialTarget, dt);
 
     if (this.pourTime > 0) {
       this.pourTime -= this.context.time.deltaTime;
@@ -113,9 +166,9 @@ export class ProductApp extends Behaviour {
     if (!show) return;
 
     const camera = this.context.mainCamera as THREE.Camera;
+    camera.updateMatrixWorld();
     const canvas = this.context.renderer.domElement;
-    const width = canvas.clientWidth;
-    const height = canvas.clientHeight;
+    const rect = canvas.getBoundingClientRect();
 
     for (const node of this.labelsLayer.querySelectorAll<HTMLElement>(".callout")) {
       const anchor = this.parts.labels.getObjectByName(node.dataset.anchor ?? "");
@@ -128,8 +181,8 @@ export class ProductApp extends Behaviour {
       const visible = this.projected.z >= -1 && this.projected.z <= 1;
       node.style.display = visible ? "block" : "none";
       if (!visible) continue;
-      node.style.left = `${(this.projected.x * 0.5 + 0.5) * width}px`;
-      node.style.top = `${(-this.projected.y * 0.5 + 0.5) * height}px`;
+      node.style.left = `${rect.left + (this.projected.x * 0.5 + 0.5) * rect.width}px`;
+      node.style.top = `${rect.top + (-this.projected.y * 0.5 + 0.5) * rect.height}px`;
     }
   }
 
@@ -145,8 +198,6 @@ export class ProductApp extends Behaviour {
     });
     document.getElementById("btn-water")?.addEventListener("click", () => {
       this.waterOut = !this.waterOut;
-      this.handleOut = this.waterOut;
-      this.trayOut = this.waterOut;
       setPressed("btn-water", this.waterOut);
     });
     document.getElementById("btn-view-left")?.addEventListener("click", () => this.setView(true));
@@ -160,10 +211,10 @@ export class ProductApp extends Behaviour {
   private bindModelClicks() {
     if (this.clickBound) return;
     const canvas = this.context.renderer.domElement;
-    canvas.addEventListener("pointerdown", (event) => {
-      this.pointerDown.set(event.clientX, event.clientY);
-    });
-    canvas.addEventListener("pointerup", (event) => this.onCanvasPointer(event));
+    const onDown = (event: PointerEvent) => this.pointerDown.set(event.clientX, event.clientY);
+    const onUp = (event: PointerEvent) => this.onCanvasPointer(event);
+    canvas.addEventListener("pointerdown", onDown, { capture: true });
+    canvas.addEventListener("pointerup", onUp, { capture: true });
     this.clickBound = true;
   }
 
@@ -175,10 +226,11 @@ export class ProductApp extends Behaviour {
   }
 
   private onCanvasPointer(event: PointerEvent) {
-    if (!this.parts || event.button !== 0) return;
+    if (!this.parts) return;
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     const dx = event.clientX - this.pointerDown.x;
     const dy = event.clientY - this.pointerDown.y;
-    if (dx * dx + dy * dy > 100) return;
+    if (dx * dx + dy * dy > 484) return;
 
     const canvas = this.context.renderer.domElement;
     const rect = canvas.getBoundingClientRect();
@@ -188,18 +240,24 @@ export class ProductApp extends Behaviour {
     );
     this.raycaster.setFromCamera(this.ndc, this.context.mainCamera as THREE.Camera);
     const hits = this.raycaster.intersectObject(this.parts.root, true);
-    if (hits.length === 0) return;
-    let object: THREE.Object3D | null = hits[0].object;
-    while (object) {
-      if (object === this.parts.oneShot && object !== this.parts.machine) {
-        this.startPour(2);
-        return;
-      }
-      if (object === this.parts.twoShot && object !== this.parts.machine) {
-        this.startPour(4);
-        return;
-      }
-      object = object.parent;
+    for (const hit of hits) {
+      const key = partKey(hit.object);
+      if (!key) continue;
+      this.tapPart(key);
+      return;
+    }
+  }
+
+  private tapPart(key: string) {
+    if (key === "switchb" || key === "switch_oneshot") this.startPour(2);
+    else if (key === "switchc" || key === "switch_twoshot") this.startPour(4);
+    else if (key === "handlegrinder") this.handleOut = !this.handleOut;
+    else if (key === "traytop" || key === "trayfront" || key === "trayfront001" || key === "trayhandle") this.trayOut = !this.trayOut;
+    else if (key === "cup") this.mugOut = !this.mugOut;
+    else if (key === "dial") this.dialTurned = !this.dialTurned;
+    else if (key === "watertray") {
+      this.waterOut = !this.waterOut;
+      setPressed("btn-water", this.waterOut);
     }
   }
 
