@@ -1,20 +1,21 @@
 import {
   addComponent,
   ContactShadows,
-  ObjectUtils,
   onStart,
   OrbitControls,
   WebXR,
-  setAutoFitEnabled,
 } from "@needle-tools/engine";
 import * as THREE from "three";
-import { createCoffeeMaker } from "./scripts/createCoffeeMaker.js";
+import { loadUnityProduct } from "./scripts/loadUnityProduct.js";
 import { ProductApp } from "./scripts/ProductApp.js";
 
 onStart((context) => {
   const scene = context.scene;
   context.mainCamera.position.set(0.55, 0.42, 0.85);
   context.menu.showFullscreenOption(true);
+
+  const hint = document.getElementById("hint");
+  if (hint) hint.textContent = "Loading Unity product…";
 
   const hemi = new THREE.HemisphereLight(0xfff4e8, 0x1a1c20, 0.7);
   scene.add(hemi);
@@ -23,43 +24,45 @@ onStart((context) => {
   key.castShadow = true;
   scene.add(key);
 
-  const product = createCoffeeMaker();
-  scene.add(product.root);
+  void (async () => {
+    try {
+      const product = await loadUnityProduct();
+      scene.add(product.root);
 
-  const shadows = ContactShadows.auto(context);
-  shadows.darkness = 0.75;
-  shadows.opacity = 0.85;
-  shadows.fitShadows({ object: product.root, positionOffset: { y: 0.01 } });
+      const shadows = ContactShadows.auto(context);
+      shadows.darkness = 0.75;
+      shadows.opacity = 0.85;
+      shadows.fitShadows({ object: product.root, positionOffset: { y: 0.01 } });
 
-  const floor = ObjectUtils.createPrimitive("Cylinder", {
-    scale: [1.4, 0.01, 1.4],
-    position: [0, -0.005, 0],
-    material: new THREE.MeshStandardMaterial({ color: 0x1b1c20, metalness: 0.1, roughness: 0.85 }),
-  });
-  setAutoFitEnabled(floor, false);
-  scene.add(floor);
+      const orbit = addComponent(scene, OrbitControls);
+      orbit.enablePan = true;
+      orbit.fitCamera({
+        objects: product.root,
+        immediate: true,
+        fitOffset: 1.15,
+        fitDirection: { x: 0.55, y: 0.28, z: 1 },
+        fov: 42,
+      });
 
-  const orbit = addComponent(scene, OrbitControls);
-  orbit.enablePan = true;
-  orbit.fitCamera({
-    objects: product.root,
-    immediate: true,
-    fitOffset: 1.15,
-    fitDirection: { x: 0.55, y: 0.28, z: 1 },
-    fov: 42,
-  });
+      const webxr = addComponent(scene, WebXR, {
+        createARButton: true,
+        createVRButton: false,
+        createQRCode: true,
+        autoPlace: false,
+        usePlacementReticle: true,
+        usePlacementAdjustment: true,
+        arScale: 1.6,
+      });
 
-  const webxr = addComponent(scene, WebXR, {
-    createARButton: true,
-    createVRButton: false,
-    createQRCode: true,
-    autoPlace: false,
-    usePlacementReticle: true,
-    usePlacementAdjustment: true,
-    arScale: 1.6,
-  });
-
-  const app = addComponent(scene, ProductApp);
-  app.webxr = webxr;
-  app.parts = product;
+      const app = addComponent(scene, ProductApp);
+      app.webxr = webxr;
+      app.parts = product;
+      app.bindProduct();
+      if (hint) hint.textContent = "Orbit to inspect · tap AR to place on a table";
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (hint) hint.textContent = message;
+      console.error(message);
+    }
+  })();
 });
