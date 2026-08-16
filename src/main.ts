@@ -52,17 +52,18 @@ async function startApp() {
 
     const orbit = addComponent(scene, OrbitControls);
     orbit.enablePan = true;
-    orbit.fitCamera({
-      objects: product.machine,
-      immediate: true,
-      fitOffset: 1.45,
-      fitDirection: { x: -0.55, y: -0.28, z: -1 },
-      fov: 38,
-    });
-    if (camera?.isPerspectiveCamera) {
-      camera.fov = 38;
-      camera.updateProjectionMatrix();
-    }
+      orbit.fitCamera({
+        objects: product.machine,
+        immediate: true,
+        fitOffset: 2.2,
+        fitDirection: { x: -0.55, y: -0.32, z: -1 },
+        fov: 38,
+      });
+      if (camera?.isPerspectiveCamera) {
+        camera.fov = 38;
+        camera.position.set(0.52, 0.26, 0.78);
+        camera.updateProjectionMatrix();
+      }
 
     const webxr = addComponent(scene, WebXR, {
       createARButton: false,
