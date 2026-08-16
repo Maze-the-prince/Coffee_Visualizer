@@ -12,10 +12,12 @@ import { ProductApp } from "./scripts/ProductApp.js";
 
 onStart((context) => {
   const scene = context.scene;
-  const camera = context.mainCamera as THREE.PerspectiveCamera;
-  camera.fov = 38;
-  camera.position.set(0.48, 0.32, 0.82);
-  camera.updateProjectionMatrix();
+  const camera = context.mainCamera as THREE.PerspectiveCamera | undefined;
+  if (camera?.isPerspectiveCamera) {
+    camera.fov = 38;
+    camera.position.set(0.48, 0.32, 0.82);
+    camera.updateProjectionMatrix();
+  }
   context.menu.showFullscreenOption(false);
   context.menu.showQRCodeButton(false);
 
@@ -54,8 +56,10 @@ onStart((context) => {
         fitDirection: { x: -0.55, y: -0.28, z: -1 },
         fov: 38,
       });
-      camera.fov = 38;
-      camera.updateProjectionMatrix();
+      if (camera?.isPerspectiveCamera) {
+        camera.fov = 38;
+        camera.updateProjectionMatrix();
+      }
 
       const webxr = addComponent(scene, WebXR, {
         createARButton: false,
