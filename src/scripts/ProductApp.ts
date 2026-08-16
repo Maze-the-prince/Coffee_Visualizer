@@ -1,6 +1,6 @@
 import { Behaviour, serializable, WebXR } from "@needle-tools/engine";
 import * as THREE from "three";
-import { CoffeeMakerParts } from "./createCoffeeMaker.js";
+import { CoffeeMakerParts } from "./loadUnityProduct.js";
 
 export class ProductApp extends Behaviour {
   @serializable(WebXR)
@@ -11,9 +11,14 @@ export class ProductApp extends Behaviour {
   private spinning = false;
   private labelsOn = false;
   private waterOut = false;
+  private handleOut = false;
+  private trayOut = false;
   private pourTime = 0;
   private pourMesh?: THREE.Mesh;
   private scale = 1;
+  private waterHome = new THREE.Vector3();
+  private handleHome = new THREE.Euler();
+  private trayHome = new THREE.Vector3();
   private hint?: HTMLElement;
   private scaleLabel?: HTMLElement;
   private arButton?: HTMLButtonElement;
@@ -26,13 +31,35 @@ export class ProductApp extends Behaviour {
   }
 
   start() {
+    this.bindProduct();
+  }
+
+  bindProduct() {
+    if (!this.parts || this.pourMesh) return;
+    this.waterHome.copy(this.parts.waterTank.position);
+    this.handleHome.copy(this.parts.portafilter.rotation);
+    this.trayHome.copy(this.parts.tray.position);
     this.createPour();
   }
 
   update() {
+    if (!this.parts) return;
+
     if (this.spinning) {
       this.parts.machine.rotateY(this.context.time.deltaTime * 0.35);
     }
+
+    const dt = Math.min(this.context.time.deltaTime * 2.4, 1);
+    const waterTarget = this.waterHome.clone();
+    if (this.waterOut) waterTarget.z -= 0.12;
+    this.parts.waterTank.position.lerp(waterTarget, dt);
+
+    const handleTarget = this.handleHome.y + (this.handleOut ? -0.55 : 0);
+    this.parts.portafilter.rotation.y = THREE.MathUtils.lerp(this.parts.portafilter.rotation.y, handleTarget, dt);
+
+    const trayTarget = this.trayHome.clone();
+    if (this.trayOut) trayTarget.z += 0.08;
+    this.parts.tray.position.lerp(trayTarget, dt);
 
     if (this.pourTime > 0) {
       this.pourTime -= this.context.time.deltaTime;
@@ -52,11 +79,12 @@ export class ProductApp extends Behaviour {
     });
     document.getElementById("btn-labels")?.addEventListener("click", () => {
       this.labelsOn = !this.labelsOn;
-      this.parts.labels.visible = this.labelsOn;
+      if (this.parts) this.parts.labels.visible = this.labelsOn;
     });
     document.getElementById("btn-water")?.addEventListener("click", () => {
       this.waterOut = !this.waterOut;
-      this.parts.waterTank.position.z = this.waterOut ? -0.28 : -0.1;
+      this.handleOut = this.waterOut;
+      this.trayOut = this.waterOut;
     });
     document.getElementById("btn-one")?.addEventListener("click", () => this.startPour(2));
     document.getElementById("btn-two")?.addEventListener("click", () => this.startPour(4));
@@ -71,6 +99,7 @@ export class ProductApp extends Behaviour {
   }
 
   private nudgeScale(factor: number) {
+    if (!this.parts) return;
     this.scale = THREE.MathUtils.clamp(this.scale * factor, 0.4, 2.5);
     this.parts.root.scale.setScalar(this.scale);
     this.showScale();
@@ -106,9 +135,12 @@ export class ProductApp extends Behaviour {
       roughness: 0.35,
       metalness: 0.05,
     });
-    this.pourMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.012, 0.09, 10), material);
-    this.pourMesh.position.set(0, 0.24, 0.18);
+    this.pourMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.01, 0.08, 10), material);
     this.pourMesh.visible = false;
-    this.parts.machine.add(this.pourMesh);
+    const box = new THREE.Box3().setFromObject(this.parts.portafilter);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    this.pourMesh.position.set(0, -Math.max(size.y * 0.35, 0.04), Math.max(size.z * 0.2, 0.02));
+    this.parts.portafilter.add(this.pourMesh);
   }
 }
