@@ -61,6 +61,32 @@ needle-menu button[title*="Quest"] {
   background: rgba(180, 28, 45, 0.92);
 }
 
+#hud button[aria-pressed="true"] {
+  background: #f4f4f5;
+  color: #111214;
+}
+
+#labels-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 30;
+}
+
+.callout {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 8px));
+  padding: 6px 10px;
+  border: 1.5px solid #fff;
+  border-radius: 8px;
+  background: rgba(12, 13, 16, 0.92);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
 .hud-top,
 .hud-bottom {
   position: absolute;

@@ -3,7 +3,6 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
 const TARGET_HEIGHT = 0.36;
-const LABEL_WORLD_WIDTH = 0.18;
 
 export type CoffeeMakerParts = {
   root: THREE.Group;
@@ -32,62 +31,9 @@ function isStudioProp(name: string) {
   return lower === "table" || lower === "tabletop" || lower.startsWith("table");
 }
 
-function makeLabel(title: string): THREE.Sprite {
-  const width = 1024;
-  const height = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d")!;
-  ctx.clearRect(0, 0, width, height);
-  const radius = 28;
-  ctx.beginPath();
-  ctx.moveTo(radius, 24);
-  ctx.lineTo(width - radius, 24);
-  ctx.quadraticCurveTo(width - 24, 24, width - 24, radius);
-  ctx.lineTo(width - 24, height - radius);
-  ctx.quadraticCurveTo(width - 24, height - 24, width - radius, height - 24);
-  ctx.lineTo(radius, height - 24);
-  ctx.quadraticCurveTo(24, height - 24, 24, height - radius);
-  ctx.lineTo(24, radius);
-  ctx.quadraticCurveTo(24, 24, radius, 24);
-  ctx.closePath();
-  ctx.fillStyle = "rgba(12, 13, 16, 0.92)";
-  ctx.fill();
-  ctx.lineWidth = 8;
-  ctx.strokeStyle = "white";
-  ctx.stroke();
-  ctx.fillStyle = "white";
-  ctx.font = "700 92px Segoe UI, sans-serif";
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillText(title, width / 2, height / 2 + 4);
-
-  const map = new THREE.CanvasTexture(canvas);
-  map.colorSpace = THREE.SRGBColorSpace;
-  map.anisotropy = 8;
-  map.minFilter = THREE.LinearFilter;
-  map.magFilter = THREE.LinearFilter;
-  map.generateMipmaps = false;
-  map.needsUpdate = true;
-
-  const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({
-      map,
-      transparent: true,
-      depthTest: false,
-      depthWrite: false,
-      sizeAttenuation: true,
-    })
-  );
-  sprite.name = `Label_${title}`;
-  sprite.center.set(0.5, 0);
-  sprite.renderOrder = 10;
-  return sprite;
-}
-
 function attachLabel(labels: THREE.Group, host: THREE.Object3D | undefined, title: string, fallback: THREE.Object3D, root: THREE.Group) {
-  const sprite = makeLabel(title);
+  const anchor = new THREE.Object3D();
+  anchor.name = `Label_${title}`;
   const target = host ?? fallback;
   target.updateWorldMatrix(true, true);
   const box = new THREE.Box3().setFromObject(target);
@@ -97,16 +43,11 @@ function attachLabel(labels: THREE.Group, host: THREE.Object3D | undefined, titl
     world.y += 0.05;
   } else {
     box.getCenter(world);
-    world.y = box.max.y + 0.02;
+    world.y = box.max.y + 0.025;
   }
   root.worldToLocal(world);
-  sprite.position.copy(world);
-
-  const rootScale = new THREE.Vector3();
-  root.getWorldScale(rootScale);
-  const width = LABEL_WORLD_WIDTH / Math.max(rootScale.x, 1e-8);
-  sprite.scale.set(width, width * 0.25, 1);
-  labels.add(sprite);
+  anchor.position.copy(world);
+  labels.add(anchor);
 }
 
 function styleUnityMaterials(root: THREE.Object3D) {
@@ -114,16 +55,17 @@ function styleUnityMaterials(root: THREE.Object3D) {
   const black = new THREE.MeshStandardMaterial({ color: 0x0a0a0b, metalness: 0.18, roughness: 0.22, envMapIntensity: 1 });
   const chrome = new THREE.MeshStandardMaterial({ color: 0xd1d5d8, metalness: 1, roughness: 0.08, envMapIntensity: 1.4 });
   const glass = new THREE.MeshPhysicalMaterial({
-    color: 0xd7eef5,
+    color: 0x8ebfd4,
     metalness: 0,
-    roughness: 0.06,
-    transmission: 0.9,
-    thickness: 0.012,
-    ior: 1.45,
+    roughness: 0.14,
+    transmission: 0.55,
+    thickness: 0.008,
+    ior: 1.4,
     transparent: true,
-    opacity: 1,
-    envMapIntensity: 1.2,
+    opacity: 0.42,
+    envMapIntensity: 1,
     depthWrite: false,
+    side: THREE.DoubleSide,
   });
   const ceramic = new THREE.MeshStandardMaterial({ color: 0xf3f1ea, metalness: 0.04, roughness: 0.55 });
   const wood = new THREE.MeshStandardMaterial({ color: 0x4a3426, roughness: 0.62, metalness: 0.06, envMapIntensity: 0.6 });
@@ -249,14 +191,14 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
 
   let source: THREE.Object3D | undefined;
   try {
-    source = await loadGltf("./models/product.glb");
+    source = await loadFbx("./models/CoffeeMaker.fbx");
   } catch {
     source = undefined;
   }
 
   if (!source) {
     try {
-      source = await loadFbx("./models/CoffeeMaker.fbx");
+      source = await loadGltf("./models/product.glb");
     } catch {
       source = undefined;
     }

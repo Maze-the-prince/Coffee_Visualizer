@@ -1,4 +1,4 @@
-import { Behaviour, serializable, WebXR } from "@needle-tools/engine";
+import { Behaviour, registerType, serializable, WebXR } from "@needle-tools/engine";
 import * as THREE from "three";
 import { CoffeeMakerParts } from "./loadUnityProduct.js";
 
@@ -14,6 +14,11 @@ function localPositionAlongAxis(object: THREE.Object3D, localAxis: THREE.Vector3
   return object.parent.worldToLocal(world);
 }
 
+function setPressed(id: string, pressed: boolean) {
+  document.getElementById(id)?.setAttribute("aria-pressed", pressed ? "true" : "false");
+}
+
+@registerType
 export class ProductApp extends Behaviour {
   @serializable(WebXR)
   webxr?: WebXR;
@@ -37,11 +42,14 @@ export class ProductApp extends Behaviour {
   private hint?: HTMLElement;
   private scaleLabel?: HTMLElement;
   private arButton?: HTMLButtonElement;
+  private labelsLayer?: HTMLElement;
+  private projected = new THREE.Vector3();
 
   awake() {
     this.hint = document.getElementById("hint") ?? undefined;
     this.scaleLabel = document.getElementById("scale-label") ?? undefined;
     this.arButton = document.getElementById("btn-ar") as HTMLButtonElement | undefined;
+    this.labelsLayer = document.getElementById("labels-layer") ?? undefined;
     this.bindUi();
   }
 
@@ -53,10 +61,10 @@ export class ProductApp extends Behaviour {
     if (!this.parts || this.pourMesh) return;
     this.fittedScale.copy(this.parts.root.scale);
     this.waterHome.copy(this.parts.waterTank.position);
-    this.waterOutPos.copy(localPositionAlongAxis(this.parts.waterTank, new THREE.Vector3(0, 0, -1), 0.08));
+    this.waterOutPos.copy(localPositionAlongAxis(this.parts.waterTank, new THREE.Vector3(0, 0, -1), 0.1));
     this.handleHome.copy(this.parts.portafilter.rotation);
     this.trayHome.copy(this.parts.tray.position);
-    this.trayOutPos.copy(localPositionAlongAxis(this.parts.tray, new THREE.Vector3(0, 0, 1), 0.06));
+    this.trayOutPos.copy(localPositionAlongAxis(this.parts.tray, new THREE.Vector3(0, 0, 1), 0.07));
     this.createPour();
   }
 
@@ -85,20 +93,52 @@ export class ProductApp extends Behaviour {
         this.pourMesh.visible = false;
       }
     }
+
+    this.projectLabels();
+  }
+
+  private projectLabels() {
+    if (!this.labelsLayer || !this.parts) return;
+    const show = this.labelsOn && this.parts.labels.visible && !this.context.isInXR;
+    this.labelsLayer.hidden = !show;
+    if (!show) return;
+
+    const camera = this.context.mainCamera as THREE.Camera;
+    const canvas = this.context.renderer.domElement;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+
+    for (const node of this.labelsLayer.querySelectorAll<HTMLElement>(".callout")) {
+      const anchor = this.parts.labels.getObjectByName(node.dataset.anchor ?? "");
+      if (!anchor) {
+        node.style.display = "none";
+        continue;
+      }
+      anchor.getWorldPosition(this.projected);
+      this.projected.project(camera);
+      const visible = this.projected.z >= -1 && this.projected.z <= 1;
+      node.style.display = visible ? "block" : "none";
+      if (!visible) continue;
+      node.style.left = `${(this.projected.x * 0.5 + 0.5) * width}px`;
+      node.style.top = `${(-this.projected.y * 0.5 + 0.5) * height}px`;
+    }
   }
 
   private bindUi() {
     document.getElementById("btn-spin")?.addEventListener("click", () => {
       this.spinning = !this.spinning;
+      setPressed("btn-spin", this.spinning);
     });
     document.getElementById("btn-labels")?.addEventListener("click", () => {
       this.labelsOn = !this.labelsOn;
       if (this.parts) this.parts.labels.visible = this.labelsOn;
+      setPressed("btn-labels", this.labelsOn);
     });
     document.getElementById("btn-water")?.addEventListener("click", () => {
       this.waterOut = !this.waterOut;
       this.handleOut = this.waterOut;
       this.trayOut = this.waterOut;
+      setPressed("btn-water", this.waterOut);
     });
     document.getElementById("btn-one")?.addEventListener("click", () => this.startPour(2));
     document.getElementById("btn-two")?.addEventListener("click", () => this.startPour(4));
@@ -140,9 +180,14 @@ export class ProductApp extends Behaviour {
     }
 
     if (this.parts.studio) this.parts.studio.visible = false;
+    if (this.labelsLayer) this.labelsLayer.hidden = true;
     if (this.hint) this.hint.textContent = "Point at a table until the ring appears, then tap to place.";
     if (this.arButton) this.arButton.textContent = "Studio";
-    void this.webxr.enterAR();
+    void Promise.resolve(this.webxr.enterAR()).catch(() => {
+      if (this.parts.studio) this.parts.studio.visible = true;
+      if (this.arButton) this.arButton.textContent = "AR";
+      if (this.hint) this.hint.textContent = "WebAR needs Chrome on Android (HTTPS). iPhone AR is limited in the browser.";
+    });
   }
 
   private createPour() {

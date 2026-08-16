@@ -10,13 +10,13 @@
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
-    <needle-engine background-color="#1a1c20" environment-image="studio"></needle-engine>
+    <needle-engine background-color="#1a1c20" environment-image="studio" camera-controls="0"></needle-engine>
 
     <div id="hud">
       <div class="hud-top">
         <button type="button" id="btn-one">One Shot</button>
         <button type="button" id="btn-ar" class="primary">AR</button>
-        <button type="button" id="btn-water">Water Replace</button>
+        <button type="button" id="btn-water" aria-pressed="false">Water Replace</button>
         <button type="button" id="btn-two">Two Shot</button>
       </div>
       <div class="hud-bottom">
@@ -24,9 +24,17 @@
           <button type="button" id="btn-smaller">−</button>
           <button type="button" id="btn-bigger">+</button>
         </div>
-        <button type="button" id="btn-spin">Spin</button>
-        <button type="button" id="btn-labels">Labels</button>
+        <button type="button" id="btn-spin" aria-pressed="false">Spin</button>
+        <button type="button" id="btn-labels" aria-pressed="false">Labels</button>
       </div>
+    </div>
+    <div id="labels-layer" hidden>
+      <span class="callout" data-anchor="Label_One Shot">One Shot</span>
+      <span class="callout" data-anchor="Label_Two Shot">Two Shot</span>
+      <span class="callout" data-anchor="Label_Power">Power</span>
+      <span class="callout" data-anchor="Label_Portafilter">Portafilter</span>
+      <span class="callout" data-anchor="Label_Coffee Mug">Coffee Mug</span>
+      <span class="callout" data-anchor="Label_Tray">Tray</span>
     </div>
     <p id="hint">Orbit to inspect · tap AR to place on a table</p>
     <p id="scale-label"></p>
