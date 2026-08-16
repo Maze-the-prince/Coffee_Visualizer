@@ -31,15 +31,14 @@ onStart((context) => {
 
   void (async () => {
     try {
-      try {
-        const envTex = await loadPMREM("https://cloud.needle.tools/hdris/studio.ktx2", context.renderer);
-        if (envTex) scene.environment = envTex;
-      } catch {
-        // Studio lighting still works without the HDRI.
-      }
-
       const product = await loadUnityProduct();
       scene.add(product.root);
+
+      void loadPMREM("https://cloud.needle.tools/hdris/studio.ktx2", context.renderer)
+        .then((envTex) => {
+          if (envTex) scene.environment = envTex;
+        })
+        .catch(() => undefined);
 
       const shadows = ContactShadows.auto(context);
       shadows.darkness = 0.55;
