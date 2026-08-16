@@ -2,7 +2,6 @@ import {
   addComponent,
   ContactShadows,
   loadPMREM,
-  onStart,
   OrbitControls,
   WebXR,
 } from "@needle-tools/engine";
@@ -10,8 +9,13 @@ import * as THREE from "three";
 import { loadUnityProduct } from "./scripts/loadUnityProduct.js";
 import { ProductApp } from "./scripts/ProductApp.js";
 
-onStart((context) => {
-  const scene = context.scene;
+async function startApp() {
+  const element = document.querySelector("needle-engine") as HTMLElement & {
+    getContext: () => Promise<any>;
+  };
+  if (!element?.getContext) return;
+  const context = await element.getContext();
+  const scene = context.scene as THREE.Scene;
   const camera = context.mainCamera as THREE.PerspectiveCamera | undefined;
   if (camera?.isPerspectiveCamera) {
     camera.fov = 38;
@@ -31,56 +35,56 @@ onStart((context) => {
   key.castShadow = true;
   scene.add(key);
 
-  void (async () => {
-    try {
-      const product = await loadUnityProduct();
-      scene.add(product.root);
+  try {
+    const product = await loadUnityProduct();
+    scene.add(product.root);
 
-      void loadPMREM("https://cloud.needle.tools/hdris/studio.ktx2", context.renderer)
-        .then((envTex) => {
-          if (envTex) scene.environment = envTex;
-        })
-        .catch(() => undefined);
+    void loadPMREM("https://cloud.needle.tools/hdris/studio.ktx2", context.renderer)
+      .then((envTex) => {
+        if (envTex) scene.environment = envTex;
+      })
+      .catch(() => undefined);
 
-      const shadows = ContactShadows.auto(context);
-      shadows.darkness = 0.55;
-      shadows.opacity = 0.65;
-      shadows.fitShadows({ object: product.machine, positionOffset: { y: 0.005 } });
+    const shadows = ContactShadows.auto(context);
+    shadows.darkness = 0.55;
+    shadows.opacity = 0.65;
+    shadows.fitShadows({ object: product.machine, positionOffset: { y: 0.005 } });
 
-      const orbit = addComponent(scene, OrbitControls);
-      orbit.enablePan = true;
-      orbit.fitCamera({
-        objects: product.machine,
-        immediate: true,
-        fitOffset: 1.45,
-        fitDirection: { x: -0.55, y: -0.28, z: -1 },
-        fov: 38,
-      });
-      if (camera?.isPerspectiveCamera) {
-        camera.fov = 38;
-        camera.updateProjectionMatrix();
-      }
-
-      const webxr = addComponent(scene, WebXR, {
-        createARButton: false,
-        createVRButton: false,
-        createQRCode: false,
-        createSendToQuestButton: false,
-        autoPlace: false,
-        usePlacementReticle: true,
-        usePlacementAdjustment: true,
-        arScale: 1,
-      });
-
-      const app = addComponent(scene, ProductApp);
-      app.webxr = webxr;
-      app.parts = product;
-      app.bindProduct();
-      if (hint) hint.textContent = "Orbit to inspect · tap AR to place on a table";
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (hint) hint.textContent = message;
-      console.error(message);
+    const orbit = addComponent(scene, OrbitControls);
+    orbit.enablePan = true;
+    orbit.fitCamera({
+      objects: product.machine,
+      immediate: true,
+      fitOffset: 1.45,
+      fitDirection: { x: -0.55, y: -0.28, z: -1 },
+      fov: 38,
+    });
+    if (camera?.isPerspectiveCamera) {
+      camera.fov = 38;
+      camera.updateProjectionMatrix();
     }
-  })();
-});
+
+    const webxr = addComponent(scene, WebXR, {
+      createARButton: false,
+      createVRButton: false,
+      createQRCode: false,
+      createSendToQuestButton: false,
+      autoPlace: false,
+      usePlacementReticle: true,
+      usePlacementAdjustment: true,
+      arScale: 1,
+    });
+
+    const app = addComponent(scene, ProductApp);
+    app.webxr = webxr;
+    app.parts = product;
+    app.bindProduct();
+    if (hint) hint.textContent = "Orbit to inspect · tap AR to place on a table";
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (hint) hint.textContent = message;
+    console.error(message);
+  }
+}
+
+void startApp();
