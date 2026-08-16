@@ -19,6 +19,10 @@ async function startApp() {
   const renderer = context.renderer as THREE.WebGLRenderer;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.AgXToneMapping;
+  renderer.toneMappingExposure = 1.08;
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   if (camera?.isPerspectiveCamera) {
     camera.fov = 38;
@@ -32,18 +36,22 @@ async function startApp() {
   const hint = document.getElementById("hint");
   if (hint) hint.textContent = "Loading Unity product…";
 
-  const hemi = new THREE.HemisphereLight(0xfff4e8, 0x1a1c20, 0.75);
+  const hemi = new THREE.HemisphereLight(0xfff4e8, 0x16181c, 0.28);
   scene.add(hemi);
-  const key = new THREE.DirectionalLight(0xfff2e0, 1.2);
-  key.position.set(1.4, 2.2, 1.1);
+  const key = new THREE.DirectionalLight(0xfff5ea, 1.05);
+  key.position.set(1.15, 1.85, 1.35);
   key.castShadow = true;
-  key.shadow.mapSize.set(1024, 1024);
-  key.shadow.camera.near = 0.2;
-  key.shadow.camera.far = 8;
-  key.shadow.camera.left = -2;
-  key.shadow.camera.right = 2;
-  key.shadow.camera.top = 2;
-  key.shadow.camera.bottom = -2;
+  const shadowSize = window.innerWidth < 700 ? 1024 : 2048;
+  key.shadow.mapSize.set(shadowSize, shadowSize);
+  key.shadow.bias = -0.00025;
+  key.shadow.normalBias = 0.018;
+  key.shadow.radius = 2.4;
+  key.shadow.camera.near = 0.15;
+  key.shadow.camera.far = 6;
+  key.shadow.camera.left = -1.4;
+  key.shadow.camera.right = 1.4;
+  key.shadow.camera.top = 1.4;
+  key.shadow.camera.bottom = -1.4;
   scene.add(key);
 
   try {
@@ -88,6 +96,7 @@ async function startApp() {
 
     const app = addComponent(scene, ProductApp);
     app.webxr = webxr;
+    app.orbit = orbit;
     app.parts = product;
     app.bindProduct();
     if (hint) hint.textContent = "Orbit to inspect · tap AR to place on a table";

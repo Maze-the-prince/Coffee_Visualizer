@@ -4,37 +4,35 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="theme-color" content="#111214" />
+    <meta name="theme-color" content="#14171c" />
     <title>Coffee Maker WebAR</title>
     <meta name="description" content="Place the espresso machine on your table in the browser with Needle Engine WebAR." />
     <link rel="stylesheet" href="./src/styles.css" />
   </head>
   <body>
-    <needle-engine background-color="#1a1c20" environment-image="studio" camera-controls="0"></needle-engine>
+    <needle-engine background-color="#15171b" environment-image="studio" tone-mapping="agx" camera-controls="0"></needle-engine>
 
     <div id="hud">
-      <div class="hud-top">
-        <button type="button" id="btn-one">One Shot</button>
-        <button type="button" id="btn-ar" class="primary">AR</button>
-        <button type="button" id="btn-water" aria-pressed="false">Water Replace</button>
-        <button type="button" id="btn-two">Two Shot</button>
-      </div>
-      <div class="hud-bottom">
-        <div class="hud-scale">
-          <button type="button" id="btn-smaller">−</button>
-          <button type="button" id="btn-bigger">+</button>
-        </div>
-        <button type="button" id="btn-spin" aria-pressed="false">Spin</button>
-        <button type="button" id="btn-labels" aria-pressed="false">Labels</button>
+      <button type="button" id="btn-water" aria-pressed="false">Water Replace</button>
+      <button type="button" id="btn-ar">AR</button>
+      <button type="button" id="btn-view-left" class="hud-studio">Move Left</button>
+      <button type="button" id="btn-view-right" class="hud-studio" hidden>Move Right</button>
+      <button type="button" id="btn-spin" aria-pressed="false">Spin</button>
+      <button type="button" id="btn-labels" aria-pressed="false">Labels</button>
+      <div id="hud-scale">
+        <button type="button" id="btn-smaller">−</button>
+        <button type="button" id="btn-bigger">+</button>
       </div>
     </div>
     <div id="labels-layer" hidden>
-      <span class="callout" data-anchor="Label_One Shot">One Shot</span>
-      <span class="callout" data-anchor="Label_Two Shot">Two Shot</span>
-      <span class="callout" data-anchor="Label_Power">Power</span>
-      <span class="callout" data-anchor="Label_Portafilter">Portafilter</span>
-      <span class="callout" data-anchor="Label_Coffee Mug">Coffee Mug</span>
+      <span class="callout callout-tap" data-anchor="Label_Power" data-action="power">Power</span>
+      <span class="callout callout-tap" data-anchor="Label_One Shot" data-action="one">One Shot</span>
+      <span class="callout callout-tap" data-anchor="Label_Two Shot" data-action="two">Two Shot</span>
+      <span class="callout" data-anchor="Label_Grinder">Grinder</span>
+      <span class="callout" data-anchor="Label_Temp Control">Temp Control</span>
+      <span class="callout" data-anchor="Label_Water Tray">Water Tray</span>
       <span class="callout" data-anchor="Label_Tray">Tray</span>
+      <span class="callout" data-anchor="Label_Coffee Mug">Coffee Mug</span>
     </div>
     <p id="hint">Orbit to inspect · tap AR to place on a table</p>
     <p id="scale-label"></p>

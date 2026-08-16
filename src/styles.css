@@ -1,8 +1,8 @@
 :root {
   color-scheme: dark;
-  --panel: rgba(12, 13, 16, 0.88);
-  --stroke: rgba(255, 255, 255, 0.78);
-  --text: #f4f4f5;
+  --panel: rgba(20, 23, 28, 0.92);
+  --stroke: rgba(255, 255, 255, 0.22);
+  --text: #ffffff;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -18,7 +18,7 @@ body {
   height: 100%;
   overflow: hidden;
   font-family: "Segoe UI", system-ui, sans-serif;
-  background: #141518;
+  background: #14171c;
 }
 
 needle-engine {
@@ -45,25 +45,122 @@ needle-menu button[title*="Quest"] {
 
 #hud button {
   pointer-events: auto;
+  position: absolute;
   min-width: 0;
-  height: 42px;
-  padding: 0 10px;
-  border: 1.5px solid var(--stroke);
-  border-radius: 10px;
+  height: 56px;
+  padding: 0 16px;
+  border: 1px solid var(--stroke);
+  border-radius: 18px;
   background: var(--panel);
   color: var(--text);
-  font-size: 13px;
+  font-size: 20px;
   font-weight: 600;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
 }
 
-#hud button.primary {
-  background: rgba(180, 28, 45, 0.92);
+#hud button:active {
+  background: rgba(38, 42, 48, 0.94);
 }
 
 #hud button[aria-pressed="true"] {
-  background: #f4f4f5;
+  background: rgba(244, 244, 245, 0.92);
   color: #111214;
+  text-shadow: none;
+}
+
+#btn-water {
+  top: calc(5.6vh + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(42vw, 300px);
+}
+
+#btn-ar {
+  top: calc(12px + var(--safe-top));
+  right: 12px;
+  width: min(22vw, 200px);
+  height: 48px;
+  font-size: 18px;
+}
+
+#hud button[hidden] {
+  display: none !important;
+}
+
+#btn-view-left {
+  left: max(12px, 4vw);
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(28vw, 240px);
+}
+
+#btn-view-right {
+  right: max(12px, 4vw);
+  top: 50%;
+  transform: translateY(-50%);
+  width: min(28vw, 240px);
+}
+
+body.in-ar .hud-studio {
+  display: none;
+}
+
+#btn-spin {
+  bottom: calc(6.4vh + var(--safe-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(36vw, 260px);
+}
+
+#btn-labels {
+  bottom: calc(6.4vh + var(--safe-bottom));
+  right: 12px;
+  width: min(32vw, 240px);
+}
+
+#hud-scale {
+  position: absolute;
+  left: 12px;
+  bottom: calc(6.4vh + var(--safe-bottom));
+  display: flex;
+  gap: 8px;
+  pointer-events: none;
+}
+
+#hud-scale button {
+  position: static;
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  padding: 0;
+  font-size: 24px;
+  pointer-events: auto;
+}
+
+#hint,
+#scale-label {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 41;
+  margin: 0;
+  color: #fff;
+  text-align: center;
+  text-shadow: 1.4px 1.4px 0 rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+
+#hint {
+  top: calc(14vh + var(--safe-top));
+  width: min(84vw, 420px);
+  font-size: 16px;
+}
+
+#scale-label {
+  bottom: calc(16vh + var(--safe-bottom));
+  font-size: 22px;
+  font-weight: 700;
 }
 
 #labels-layer {
@@ -76,88 +173,30 @@ needle-menu button[title*="Quest"] {
 .callout {
   position: absolute;
   transform: translate(-50%, calc(-100% - 8px));
-  padding: 6px 10px;
-  border: 1.5px solid #fff;
-  border-radius: 8px;
-  background: rgba(12, 13, 16, 0.92);
+  padding: 8px 14px;
+  border: 2px solid #fff;
+  border-radius: 10px;
+  background: rgba(20, 23, 28, 0.92);
   color: #fff;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.7);
 }
 
-.hud-top,
-.hud-bottom {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  display: grid;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.hud-top {
-  top: calc(12px + var(--safe-top));
-  grid-template-columns: 1fr 88px;
-}
-
-.hud-bottom {
-  bottom: calc(56px + var(--safe-bottom));
-  grid-template-columns: auto minmax(72px, 1fr) auto;
-  align-items: center;
-}
-
-.hud-top button,
-.hud-bottom button,
-.hud-scale button {
+.callout-tap {
   pointer-events: auto;
-  width: 100%;
-}
-
-.hud-scale {
-  display: flex;
-  gap: 6px;
-}
-
-.hud-scale button {
-  width: 42px;
-  min-width: 42px;
-  padding: 0;
-}
-
-#hint,
-#scale-label {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 41;
-  margin: 0;
-  color: #fff;
-  text-align: center;
-  text-shadow: 0 1px 4px #000;
-  pointer-events: none;
-}
-
-#hint {
-  top: calc(108px + var(--safe-top));
-  width: min(92vw, 420px);
-  font-size: 14px;
-}
-
-#scale-label {
-  bottom: calc(112px + var(--safe-bottom));
-  font-size: 18px;
-  font-weight: 700;
+  cursor: pointer;
 }
 
 @media (min-width: 720px) {
   #hud button {
-    height: 48px;
-    font-size: 15px;
+    height: 64px;
+    font-size: 22px;
   }
 
-  .hud-top {
-    grid-template-columns: 1fr 120px;
+  #btn-ar {
+    height: 52px;
   }
 }

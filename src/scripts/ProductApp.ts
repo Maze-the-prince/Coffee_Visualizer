@@ -1,4 +1,4 @@
-import { Behaviour, registerType, serializable, WebXR } from "@needle-tools/engine";
+import { Behaviour, OrbitControls, registerType, serializable, WebXR } from "@needle-tools/engine";
 import * as THREE from "three";
 import { CoffeeMakerParts } from "./loadUnityProduct.js";
 
@@ -23,6 +23,9 @@ export class ProductApp extends Behaviour {
   @serializable(WebXR)
   webxr?: WebXR;
 
+  @serializable(OrbitControls)
+  orbit?: OrbitControls;
+
   parts!: CoffeeMakerParts;
 
   private spinning = false;
@@ -44,6 +47,11 @@ export class ProductApp extends Behaviour {
   private arButton?: HTMLButtonElement;
   private labelsLayer?: HTMLElement;
   private projected = new THREE.Vector3();
+  private ndc = new THREE.Vector2();
+  private raycaster = new THREE.Raycaster();
+  private pointerDown = new THREE.Vector2();
+  private clickBound = false;
+  private leftView = false;
 
   awake() {
     this.hint = document.getElementById("hint") ?? undefined;
@@ -66,6 +74,7 @@ export class ProductApp extends Behaviour {
     this.trayHome.copy(this.parts.tray.position);
     this.trayOutPos.copy(localPositionAlongAxis(this.parts.tray, new THREE.Vector3(0, 0, 1), 0.07));
     this.createPour();
+    this.bindModelClicks();
   }
 
   update() {
@@ -140,11 +149,74 @@ export class ProductApp extends Behaviour {
       this.trayOut = this.waterOut;
       setPressed("btn-water", this.waterOut);
     });
-    document.getElementById("btn-one")?.addEventListener("click", () => this.startPour(2));
-    document.getElementById("btn-two")?.addEventListener("click", () => this.startPour(4));
+    document.getElementById("btn-view-left")?.addEventListener("click", () => this.setView(true));
+    document.getElementById("btn-view-right")?.addEventListener("click", () => this.setView(false));
     document.getElementById("btn-smaller")?.addEventListener("click", () => this.nudgeScale(0.9));
     document.getElementById("btn-bigger")?.addEventListener("click", () => this.nudgeScale(1.1));
+    this.labelsLayer?.addEventListener("click", (event) => this.onLabelClick(event));
     this.arButton?.addEventListener("click", () => this.toggleAr());
+  }
+
+  private bindModelClicks() {
+    if (this.clickBound) return;
+    const canvas = this.context.renderer.domElement;
+    canvas.addEventListener("pointerdown", (event) => {
+      this.pointerDown.set(event.clientX, event.clientY);
+    });
+    canvas.addEventListener("pointerup", (event) => this.onCanvasPointer(event));
+    this.clickBound = true;
+  }
+
+  private onLabelClick(event: Event) {
+    const target = event.target as HTMLElement | null;
+    const action = target?.dataset.action;
+    if (action === "one") this.startPour(2);
+    else if (action === "two") this.startPour(4);
+  }
+
+  private onCanvasPointer(event: PointerEvent) {
+    if (!this.parts || event.button !== 0) return;
+    const dx = event.clientX - this.pointerDown.x;
+    const dy = event.clientY - this.pointerDown.y;
+    if (dx * dx + dy * dy > 100) return;
+
+    const canvas = this.context.renderer.domElement;
+    const rect = canvas.getBoundingClientRect();
+    this.ndc.set(
+      ((event.clientX - rect.left) / rect.width) * 2 - 1,
+      -((event.clientY - rect.top) / rect.height) * 2 + 1
+    );
+    this.raycaster.setFromCamera(this.ndc, this.context.mainCamera as THREE.Camera);
+    const hits = this.raycaster.intersectObject(this.parts.root, true);
+    if (hits.length === 0) return;
+    let object: THREE.Object3D | null = hits[0].object;
+    while (object) {
+      if (object === this.parts.oneShot && object !== this.parts.machine) {
+        this.startPour(2);
+        return;
+      }
+      if (object === this.parts.twoShot && object !== this.parts.machine) {
+        this.startPour(4);
+        return;
+      }
+      object = object.parent;
+    }
+  }
+
+  private setView(left: boolean) {
+    const camera = this.context.mainCamera as THREE.PerspectiveCamera | undefined;
+    if (!camera || !this.orbit) return;
+    this.leftView = left;
+    if (left) camera.position.set(-0.45, 0.45, 0.98);
+    else camera.position.set(0.55, 0.48, 0.92);
+    camera.lookAt(0, 0.16, 0);
+    camera.updateProjectionMatrix();
+    this.orbit.setCameraAndLookTarget(camera, true);
+
+    const leftBtn = document.getElementById("btn-view-left");
+    const rightBtn = document.getElementById("btn-view-right");
+    if (leftBtn) leftBtn.hidden = left;
+    if (rightBtn) rightBtn.hidden = !left;
   }
 
   private startPour(seconds: number) {
@@ -173,6 +245,7 @@ export class ProductApp extends Behaviour {
     if (!this.webxr) return;
     if (this.context.isInXR) {
       this.webxr.exitXR();
+      document.body.classList.remove("in-ar");
       if (this.parts.studio) this.parts.studio.visible = true;
       if (this.arButton) this.arButton.textContent = "AR";
       if (this.hint) this.hint.textContent = "Orbit to inspect · tap AR to place on a table";
@@ -181,9 +254,11 @@ export class ProductApp extends Behaviour {
 
     if (this.parts.studio) this.parts.studio.visible = false;
     if (this.labelsLayer) this.labelsLayer.hidden = true;
+    document.body.classList.add("in-ar");
     if (this.hint) this.hint.textContent = "Point at a table until the ring appears, then tap to place.";
     if (this.arButton) this.arButton.textContent = "Studio";
     void Promise.resolve(this.webxr.enterAR()).catch(() => {
+      document.body.classList.remove("in-ar");
       if (this.parts.studio) this.parts.studio.visible = true;
       if (this.arButton) this.arButton.textContent = "AR";
       if (this.hint) this.hint.textContent = "WebAR needs Chrome on Android (HTTPS). iPhone AR is limited in the browser.";
