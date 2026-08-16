@@ -26,11 +26,19 @@ needle-engine {
   height: 100%;
 }
 
+needle-menu [data-needle="webxr-sendtoquest-button"],
+needle-menu [data-needle="webxr-ar-button"],
+needle-menu [data-needle="webxr-vr-button"],
+needle-menu button[title*="QR code"],
+needle-menu button[title*="Quest"] {
+  display: none !important;
+}
+
 #hud {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 20;
+  z-index: 40;
 }
 
 #hud button {

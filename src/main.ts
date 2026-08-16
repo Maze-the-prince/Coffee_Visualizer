@@ -12,7 +12,8 @@ import { ProductApp } from "./scripts/ProductApp.js";
 onStart((context) => {
   const scene = context.scene;
   context.mainCamera.position.set(0.55, 0.42, 0.85);
-  context.menu.showFullscreenOption(true);
+  context.menu.showFullscreenOption(false);
+  context.menu.showQRCodeButton(false);
 
   const hint = document.getElementById("hint");
   if (hint) hint.textContent = "Loading Unity product…";
@@ -39,19 +40,20 @@ onStart((context) => {
       orbit.fitCamera({
         objects: product.root,
         immediate: true,
-        fitOffset: 1.15,
+        fitOffset: 1.2,
         fitDirection: { x: 0.55, y: 0.28, z: 1 },
         fov: 42,
       });
 
       const webxr = addComponent(scene, WebXR, {
-        createARButton: true,
+        createARButton: false,
         createVRButton: false,
-        createQRCode: true,
+        createQRCode: false,
+        createSendToQuestButton: false,
         autoPlace: false,
         usePlacementReticle: true,
         usePlacementAdjustment: true,
-        arScale: 1.6,
+        arScale: 1,
       });
 
       const app = addComponent(scene, ProductApp);

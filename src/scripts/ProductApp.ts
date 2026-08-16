@@ -2,6 +2,18 @@ import { Behaviour, serializable, WebXR } from "@needle-tools/engine";
 import * as THREE from "three";
 import { CoffeeMakerParts } from "./loadUnityProduct.js";
 
+function localPositionAlongAxis(object: THREE.Object3D, localAxis: THREE.Vector3, distance: number) {
+  const origin = object.getWorldPosition(new THREE.Vector3());
+  const worldDelta = object
+    .localToWorld(localAxis.clone())
+    .sub(origin)
+    .normalize()
+    .multiplyScalar(distance);
+  const world = origin.add(worldDelta);
+  if (!object.parent) return world;
+  return object.parent.worldToLocal(world);
+}
+
 export class ProductApp extends Behaviour {
   @serializable(WebXR)
   webxr?: WebXR;
@@ -15,10 +27,13 @@ export class ProductApp extends Behaviour {
   private trayOut = false;
   private pourTime = 0;
   private pourMesh?: THREE.Mesh;
-  private scale = 1;
+  private userScale = 1;
+  private fittedScale = new THREE.Vector3(1, 1, 1);
   private waterHome = new THREE.Vector3();
+  private waterOutPos = new THREE.Vector3();
   private handleHome = new THREE.Euler();
   private trayHome = new THREE.Vector3();
+  private trayOutPos = new THREE.Vector3();
   private hint?: HTMLElement;
   private scaleLabel?: HTMLElement;
   private arButton?: HTMLButtonElement;
@@ -36,9 +51,12 @@ export class ProductApp extends Behaviour {
 
   bindProduct() {
     if (!this.parts || this.pourMesh) return;
+    this.fittedScale.copy(this.parts.root.scale);
     this.waterHome.copy(this.parts.waterTank.position);
+    this.waterOutPos.copy(localPositionAlongAxis(this.parts.waterTank, new THREE.Vector3(0, 0, -1), 0.08));
     this.handleHome.copy(this.parts.portafilter.rotation);
     this.trayHome.copy(this.parts.tray.position);
+    this.trayOutPos.copy(localPositionAlongAxis(this.parts.tray, new THREE.Vector3(0, 0, 1), 0.06));
     this.createPour();
   }
 
@@ -46,26 +64,22 @@ export class ProductApp extends Behaviour {
     if (!this.parts) return;
 
     if (this.spinning) {
-      this.parts.machine.rotateY(this.context.time.deltaTime * 0.35);
+      this.parts.root.rotateY(this.context.time.deltaTime * 0.35);
     }
 
     const dt = Math.min(this.context.time.deltaTime * 2.4, 1);
-    const waterTarget = this.waterHome.clone();
-    if (this.waterOut) waterTarget.z -= 0.12;
-    this.parts.waterTank.position.lerp(waterTarget, dt);
+    this.parts.waterTank.position.lerp(this.waterOut ? this.waterOutPos : this.waterHome, dt);
 
     const handleTarget = this.handleHome.y + (this.handleOut ? -0.55 : 0);
     this.parts.portafilter.rotation.y = THREE.MathUtils.lerp(this.parts.portafilter.rotation.y, handleTarget, dt);
 
-    const trayTarget = this.trayHome.clone();
-    if (this.trayOut) trayTarget.z += 0.08;
-    this.parts.tray.position.lerp(trayTarget, dt);
+    this.parts.tray.position.lerp(this.trayOut ? this.trayOutPos : this.trayHome, dt);
 
     if (this.pourTime > 0) {
       this.pourTime -= this.context.time.deltaTime;
       if (this.pourMesh) {
         this.pourMesh.visible = true;
-        this.pourMesh.scale.y = 0.6 + Math.sin(this.context.time.time * 12) * 0.08;
+        this.pourMesh.scale.y = 1 + Math.sin(this.context.time.time * 12) * 0.08;
       }
       if (this.pourTime <= 0 && this.pourMesh) {
         this.pourMesh.visible = false;
@@ -100,14 +114,14 @@ export class ProductApp extends Behaviour {
 
   private nudgeScale(factor: number) {
     if (!this.parts) return;
-    this.scale = THREE.MathUtils.clamp(this.scale * factor, 0.4, 2.5);
-    this.parts.root.scale.setScalar(this.scale);
+    this.userScale = THREE.MathUtils.clamp(this.userScale * factor, 0.4, 2.5);
+    this.parts.root.scale.copy(this.fittedScale).multiplyScalar(this.userScale);
     this.showScale();
   }
 
   private showScale() {
     if (!this.scaleLabel) return;
-    this.scaleLabel.textContent = `Size ${Math.round(this.scale * 100)}%`;
+    this.scaleLabel.textContent = `Size ${Math.round(this.userScale * 100)}%`;
     window.setTimeout(() => {
       if (this.scaleLabel && this.scaleLabel.textContent?.startsWith("Size")) {
         this.scaleLabel.textContent = "";
@@ -135,12 +149,13 @@ export class ProductApp extends Behaviour {
       roughness: 0.35,
       metalness: 0.05,
     });
-    this.pourMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.01, 0.08, 10), material);
+    const worldScale = new THREE.Vector3();
+    this.parts.portafilter.getWorldScale(worldScale);
+    const height = 0.07 / Math.max(worldScale.y, 1e-8);
+    const radius = 0.007 / Math.max(worldScale.x, 1e-8);
+    this.pourMesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius * 1.4, height, 10), material);
     this.pourMesh.visible = false;
-    const box = new THREE.Box3().setFromObject(this.parts.portafilter);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    this.pourMesh.position.set(0, -Math.max(size.y * 0.35, 0.04), Math.max(size.z * 0.2, 0.02));
+    this.pourMesh.position.set(0, -height * 0.55, 0);
     this.parts.portafilter.add(this.pourMesh);
   }
 }

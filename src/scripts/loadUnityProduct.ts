@@ -2,6 +2,9 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
+const TARGET_HEIGHT = 0.36;
+const LABEL_WORLD_WIDTH = 0.13;
+
 export type CoffeeMakerParts = {
   root: THREE.Group;
   machine: THREE.Object3D;
@@ -23,43 +26,77 @@ function findNamed(root: THREE.Object3D, name: string): THREE.Object3D | undefin
   return found;
 }
 
+function isStudioProp(name: string) {
+  const lower = name.toLowerCase();
+  return lower === "table" || lower === "tabletop" || lower.startsWith("table");
+}
+
+function hideStudioProps(root: THREE.Object3D) {
+  root.traverse((child) => {
+    if (!isStudioProp(child.name)) return;
+    child.visible = false;
+    child.traverse((nested) => {
+      nested.visible = false;
+    });
+  });
+}
+
+function hasHiddenAncestor(object: THREE.Object3D) {
+  let current: THREE.Object3D | null = object;
+  while (current) {
+    if (!current.visible || isStudioProp(current.name)) return true;
+    current = current.parent;
+  }
+  return false;
+}
+
 function makeLabel(title: string): THREE.Sprite {
   const canvas = document.createElement("canvas");
   canvas.width = 256;
   canvas.height = 64;
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, 256, 64);
+  ctx.fillStyle = "rgba(12, 13, 16, 0.82)";
+  ctx.fillRect(8, 8, 240, 48);
   ctx.strokeStyle = "white";
   ctx.lineWidth = 3;
   ctx.strokeRect(8, 8, 240, 48);
   ctx.fillStyle = "white";
-  ctx.font = "700 28px Segoe UI, sans-serif";
+  ctx.font = "700 26px Segoe UI, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(title, 128, 32);
   const map = new THREE.CanvasTexture(canvas);
-  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map, transparent: true, depthTest: false }));
-  sprite.scale.set(0.22, 0.055, 1);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(
+    new THREE.SpriteMaterial({ map, transparent: true, depthTest: false, sizeAttenuation: true })
+  );
+  sprite.name = `Label_${title}`;
+  sprite.scale.set(LABEL_WORLD_WIDTH, LABEL_WORLD_WIDTH * 0.25, 1);
   return sprite;
 }
 
-function attachLabel(parent: THREE.Object3D | undefined, title: string, fallback: THREE.Object3D, local: THREE.Vector3) {
+function attachLabel(labels: THREE.Group, host: THREE.Object3D | undefined, title: string, fallback: THREE.Object3D, root: THREE.Group) {
   const sprite = makeLabel(title);
-  const host = parent ?? fallback;
-  const box = new THREE.Box3().setFromObject(host);
-  const size = new THREE.Vector3();
-  box.getSize(size);
-  sprite.position.copy(local);
-  if (size.length() > 0.01) {
-    sprite.scale.set(Math.max(size.x, 0.12) * 1.6, Math.max(size.x, 0.12) * 0.4, 1);
+  const target = host ?? fallback;
+  target.updateWorldMatrix(true, true);
+  const box = new THREE.Box3().setFromObject(target);
+  const world = new THREE.Vector3();
+  if (box.isEmpty()) {
+    target.getWorldPosition(world);
+    world.y += 0.05;
+  } else {
+    box.getCenter(world);
+    world.y = box.max.y + 0.03;
   }
-  host.add(sprite);
-  return sprite;
-}
+  root.worldToLocal(world);
+  sprite.position.copy(world);
 
-function isStudioProp(name: string) {
-  const lower = name.toLowerCase();
-  return lower === "table" || lower === "tabletop";
+  const rootScale = new THREE.Vector3();
+  root.getWorldScale(rootScale);
+  const width = LABEL_WORLD_WIDTH / Math.max(rootScale.x, 1e-8);
+  sprite.scale.set(width, width * 0.25, 1);
+  labels.add(sprite);
 }
 
 function styleUnityMaterials(root: THREE.Object3D) {
@@ -82,7 +119,7 @@ function styleUnityMaterials(root: THREE.Object3D) {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     const lower = mesh.name.toLowerCase();
-    if (isStudioProp(mesh.name)) {
+    if (hasHiddenAncestor(mesh) || isStudioProp(mesh.name)) {
       mesh.visible = false;
       return;
     }
@@ -94,24 +131,43 @@ function styleUnityMaterials(root: THREE.Object3D) {
   });
 }
 
-function fitRoot(root: THREE.Group) {
+function productWorldBox(root: THREE.Object3D) {
   root.updateMatrixWorld(true);
   const box = new THREE.Box3();
   root.traverse((child) => {
     const mesh = child as THREE.Mesh;
-    if (!mesh.isMesh || !mesh.visible || isStudioProp(mesh.name)) return;
-    box.expandByObject(mesh);
+    if (!mesh.isMesh || hasHiddenAncestor(mesh) || isStudioProp(mesh.name)) return;
+    const geometry = mesh.geometry;
+    if (!geometry) return;
+    if (!geometry.boundingBox) geometry.computeBoundingBox();
+    const local = geometry.boundingBox;
+    if (!local || local.isEmpty()) return;
+    box.union(local.clone().applyMatrix4(mesh.matrixWorld));
   });
-  if (box.isEmpty()) box.setFromObject(root);
+  return box;
+}
+
+function fitRoot(root: THREE.Group) {
+  root.position.set(0, 0, 0);
+  root.rotation.set(0, 0, 0);
+  root.scale.set(1, 1, 1);
+  root.updateMatrixWorld(true);
+
+  const box = productWorldBox(root);
+  if (box.isEmpty()) return;
 
   const size = new THREE.Vector3();
   const center = new THREE.Vector3();
   box.getSize(size);
   box.getCenter(center);
-  root.position.sub(center);
-  root.position.y += size.y * 0.5;
-  const tallest = Math.max(size.y, 0.001);
-  root.scale.multiplyScalar(0.42 / tallest);
+
+  root.position.x -= center.x;
+  root.position.z -= center.z;
+  root.position.y -= box.min.y;
+
+  const tallest = Math.max(size.y, 1e-6);
+  root.scale.setScalar(TARGET_HEIGHT / tallest);
+  root.updateMatrixWorld(true);
 }
 
 async function loadGltf(url: string): Promise<THREE.Group> {
@@ -152,6 +208,7 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
 
   source.name = source.name || "UnityProduct";
   root.add(source);
+  hideStudioProps(root);
   styleUnityMaterials(root);
   fitRoot(root);
 
@@ -164,13 +221,13 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
   const labels = new THREE.Group();
   labels.name = "Labels";
   labels.visible = false;
-  attachLabel(findNamed(root, "Switch_OneShot") ?? findNamed(root, "SwitchB"), "One Shot", machine, new THREE.Vector3(0, 0.08, 0.05));
-  attachLabel(findNamed(root, "Switch_TwoShot") ?? findNamed(root, "SwitchC"), "Two Shot", machine, new THREE.Vector3(0, 0.08, 0.05));
-  attachLabel(findNamed(root, "Switch_Power"), "Power", machine, new THREE.Vector3(0.05, 0.08, 0));
-  attachLabel(portafilter, "Portafilter", machine, new THREE.Vector3(0, 0.05, 0.08));
-  attachLabel(mug, "Coffee Mug", machine, new THREE.Vector3(0, 0.08, 0));
-  attachLabel(tray, "Tray", machine, new THREE.Vector3(0, 0.04, 0.06));
   root.add(labels);
+  attachLabel(labels, findNamed(root, "Switch_OneShot") ?? findNamed(root, "SwitchB"), "One Shot", machine, root);
+  attachLabel(labels, findNamed(root, "Switch_TwoShot") ?? findNamed(root, "SwitchC"), "Two Shot", machine, root);
+  attachLabel(labels, findNamed(root, "Switch_Power"), "Power", machine, root);
+  attachLabel(labels, portafilter, "Portafilter", machine, root);
+  attachLabel(labels, mug, "Coffee Mug", machine, root);
+  attachLabel(labels, tray, "Tray", machine, root);
 
   return { root, machine, mug, waterTank, portafilter, tray, labels };
 }
