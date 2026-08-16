@@ -133,11 +133,13 @@ export class ProductApp extends Behaviour {
     if (!this.webxr) return;
     if (this.context.isInXR) {
       this.webxr.exitXR();
+      if (this.parts.studio) this.parts.studio.visible = true;
       if (this.arButton) this.arButton.textContent = "AR";
       if (this.hint) this.hint.textContent = "Orbit to inspect · tap AR to place on a table";
       return;
     }
 
+    if (this.parts.studio) this.parts.studio.visible = false;
     if (this.hint) this.hint.textContent = "Point at a table until the ring appears, then tap to place.";
     if (this.arButton) this.arButton.textContent = "Studio";
     void this.webxr.enterAR();

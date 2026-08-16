@@ -3,7 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { FBXLoader } from "three/examples/jsm/loaders/FBXLoader.js";
 
 const TARGET_HEIGHT = 0.36;
-const LABEL_WORLD_WIDTH = 0.13;
+const LABEL_WORLD_WIDTH = 0.18;
 
 export type CoffeeMakerParts = {
   root: THREE.Group;
@@ -13,6 +13,7 @@ export type CoffeeMakerParts = {
   portafilter: THREE.Object3D;
   tray: THREE.Object3D;
   labels: THREE.Group;
+  studio: THREE.Group;
 };
 
 function findNamed(root: THREE.Object3D, name: string): THREE.Object3D | undefined {
@@ -31,46 +32,57 @@ function isStudioProp(name: string) {
   return lower === "table" || lower === "tabletop" || lower.startsWith("table");
 }
 
-function stripStudioProps(root: THREE.Object3D) {
-  const remove: THREE.Object3D[] = [];
-  root.traverse((child) => {
-    if (isStudioProp(child.name)) remove.push(child);
-  });
-  for (const child of remove) child.removeFromParent();
-}
-
-function hasHiddenAncestor(object: THREE.Object3D) {
-  let current: THREE.Object3D | null = object;
-  while (current) {
-    if (!current.visible || isStudioProp(current.name)) return true;
-    current = current.parent;
-  }
-  return false;
-}
-
 function makeLabel(title: string): THREE.Sprite {
+  const width = 1024;
+  const height = 256;
   const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 64;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d")!;
-  ctx.clearRect(0, 0, 256, 64);
-  ctx.fillStyle = "rgba(12, 13, 16, 0.82)";
-  ctx.fillRect(8, 8, 240, 48);
+  ctx.clearRect(0, 0, width, height);
+  const radius = 28;
+  ctx.beginPath();
+  ctx.moveTo(radius, 24);
+  ctx.lineTo(width - radius, 24);
+  ctx.quadraticCurveTo(width - 24, 24, width - 24, radius);
+  ctx.lineTo(width - 24, height - radius);
+  ctx.quadraticCurveTo(width - 24, height - 24, width - radius, height - 24);
+  ctx.lineTo(radius, height - 24);
+  ctx.quadraticCurveTo(24, height - 24, 24, height - radius);
+  ctx.lineTo(24, radius);
+  ctx.quadraticCurveTo(24, 24, radius, 24);
+  ctx.closePath();
+  ctx.fillStyle = "rgba(12, 13, 16, 0.92)";
+  ctx.fill();
+  ctx.lineWidth = 8;
   ctx.strokeStyle = "white";
-  ctx.lineWidth = 3;
-  ctx.strokeRect(8, 8, 240, 48);
+  ctx.stroke();
   ctx.fillStyle = "white";
-  ctx.font = "700 26px Segoe UI, sans-serif";
+  ctx.font = "700 92px Segoe UI, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  ctx.fillText(title, 128, 32);
+  ctx.fillText(title, width / 2, height / 2 + 4);
+
   const map = new THREE.CanvasTexture(canvas);
   map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+  map.minFilter = THREE.LinearFilter;
+  map.magFilter = THREE.LinearFilter;
+  map.generateMipmaps = false;
+  map.needsUpdate = true;
+
   const sprite = new THREE.Sprite(
-    new THREE.SpriteMaterial({ map, transparent: true, depthTest: false, sizeAttenuation: true })
+    new THREE.SpriteMaterial({
+      map,
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      sizeAttenuation: true,
+    })
   );
   sprite.name = `Label_${title}`;
-  sprite.scale.set(LABEL_WORLD_WIDTH, LABEL_WORLD_WIDTH * 0.25, 1);
+  sprite.center.set(0.5, 0);
+  sprite.renderOrder = 10;
   return sprite;
 }
 
@@ -85,7 +97,7 @@ function attachLabel(labels: THREE.Group, host: THREE.Object3D | undefined, titl
     world.y += 0.05;
   } else {
     box.getCenter(world);
-    world.y = box.max.y + 0.03;
+    world.y = box.max.y + 0.02;
   }
   root.worldToLocal(world);
   sprite.position.copy(world);
@@ -114,6 +126,8 @@ function styleUnityMaterials(root: THREE.Object3D) {
     depthWrite: false,
   });
   const ceramic = new THREE.MeshStandardMaterial({ color: 0xf3f1ea, metalness: 0.04, roughness: 0.55 });
+  const wood = new THREE.MeshStandardMaterial({ color: 0x4a3426, roughness: 0.62, metalness: 0.06, envMapIntensity: 0.6 });
+  const stone = new THREE.MeshStandardMaterial({ color: 0x6b6560, roughness: 0.48, metalness: 0.12, envMapIntensity: 0.7 });
 
   root.traverse((child) => {
     const mesh = child as THREE.Mesh;
@@ -121,8 +135,12 @@ function styleUnityMaterials(root: THREE.Object3D) {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     const lower = mesh.name.toLowerCase();
-    if (hasHiddenAncestor(mesh) || isStudioProp(mesh.name)) {
-      mesh.visible = false;
+    if (lower === "tabletop") {
+      mesh.material = stone;
+      return;
+    }
+    if (isStudioProp(mesh.name)) {
+      mesh.material = wood;
       return;
     }
     if (lower.includes("handlegrinder") || lower.includes("traytop") || lower === "dial" || lower.includes("pointer")) mesh.material = black;
@@ -138,7 +156,7 @@ function productWorldBox(root: THREE.Object3D) {
   const box = new THREE.Box3();
   root.traverse((child) => {
     const mesh = child as THREE.Mesh;
-    if (!mesh.isMesh || hasHiddenAncestor(mesh) || isStudioProp(mesh.name)) return;
+    if (!mesh.isMesh || !mesh.visible || isStudioProp(mesh.name)) return;
     const geometry = mesh.geometry;
     if (!geometry) return;
     if (!geometry.boundingBox) geometry.computeBoundingBox();
@@ -170,6 +188,48 @@ function fitRoot(root: THREE.Group) {
   const tallest = Math.max(size.y, 1e-6);
   root.scale.setScalar(TARGET_HEIGHT / tallest);
   root.updateMatrixWorld(true);
+}
+
+function seatOnTable(root: THREE.Group) {
+  const tabletop = findNamed(root, "Tabletop") ?? findNamed(root, "Table");
+  if (!tabletop) return;
+  root.updateMatrixWorld(true);
+  const top = new THREE.Box3().setFromObject(tabletop);
+  if (top.isEmpty()) return;
+  root.position.y += -top.max.y + 0.002;
+  root.updateMatrixWorld(true);
+}
+
+function createStudio(root: THREE.Group) {
+  const studio = new THREE.Group();
+  studio.name = "Studio";
+
+  const table = findNamed(root, "Table");
+  const floorY = table ? new THREE.Box3().setFromObject(table).min.y : -0.02;
+
+  const floor = new THREE.Mesh(
+    new THREE.CircleGeometry(3.2, 64),
+    new THREE.MeshStandardMaterial({ color: 0x1b1d21, roughness: 0.92, metalness: 0.04 })
+  );
+  floor.name = "StudioFloor";
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = floorY;
+  floor.receiveShadow = true;
+  studio.add(floor);
+
+  const backdrop = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.5, 2.8),
+    new THREE.MeshStandardMaterial({ color: 0x2c2f35, roughness: 0.95, metalness: 0 })
+  );
+  backdrop.name = "StudioBackdrop";
+  backdrop.position.set(0, 1.15 + floorY, -1.65);
+  studio.add(backdrop);
+
+  const fill = new THREE.PointLight(0xfff2e4, 0.45, 6, 1.4);
+  fill.position.set(-1.1, 1.4, 0.8);
+  studio.add(fill);
+
+  return studio;
 }
 
 async function loadGltf(url: string): Promise<THREE.Group> {
@@ -210,15 +270,20 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
 
   source.name = source.name || "UnityProduct";
   root.add(source);
-  stripStudioProps(root);
   styleUnityMaterials(root);
   fitRoot(root);
+  seatOnTable(root);
 
   const machine = findNamed(root, "MainUnit") ?? findNamed(root, "CoffeeMachine") ?? source;
   const mug = findNamed(root, "Cup") ?? machine;
   const waterTank = findNamed(root, "WaterTray") ?? findNamed(root, "Glass") ?? machine;
   const portafilter = findNamed(root, "HandleGrinder") ?? machine;
   const tray = findNamed(root, "TrayTop") ?? findNamed(root, "TrayFront") ?? machine;
+  const studio = createStudio(root);
+  const table = findNamed(root, "Table");
+  const tabletop = findNamed(root, "Tabletop");
+  if (table) studio.attach(table);
+  if (tabletop && tabletop !== table) studio.attach(tabletop);
 
   const labels = new THREE.Group();
   labels.name = "Labels";
@@ -231,5 +296,5 @@ export async function loadUnityProduct(): Promise<CoffeeMakerParts> {
   attachLabel(labels, mug, "Coffee Mug", machine, root);
   attachLabel(labels, tray, "Tray", machine, root);
 
-  return { root, machine, mug, waterTank, portafilter, tray, labels };
+  return { root, machine, mug, waterTank, portafilter, tray, labels, studio };
 }

@@ -1,6 +1,5 @@
 import {
   addComponent,
-  ContactShadows,
   loadPMREM,
   OrbitControls,
   WebXR,
@@ -36,32 +35,28 @@ async function startApp() {
   scene.add(key);
 
   try {
-    const product = await loadUnityProduct();
-    scene.add(product.root);
+      const product = await loadUnityProduct();
+      scene.add(product.root);
+      scene.add(product.studio);
 
-    void loadPMREM("https://cloud.needle.tools/hdris/studio.ktx2", context.renderer)
-      .then((envTex) => {
-        if (envTex) scene.environment = envTex;
-      })
-      .catch(() => undefined);
+      void loadPMREM("https://cloud.needle.tools/hdris/studio.ktx2", context.renderer)
+        .then((envTex) => {
+          if (envTex) scene.environment = envTex;
+        })
+        .catch(() => undefined);
 
-    const shadows = ContactShadows.auto(context);
-    shadows.darkness = 0.55;
-    shadows.opacity = 0.65;
-    shadows.fitShadows({ object: product.machine, positionOffset: { y: 0.005 } });
-
-    const orbit = addComponent(scene, OrbitControls);
-    orbit.enablePan = true;
+      const orbit = addComponent(scene, OrbitControls);
+      orbit.enablePan = true;
       orbit.fitCamera({
-        objects: product.machine,
+        objects: product.root,
         immediate: true,
-        fitOffset: 2.2,
-        fitDirection: { x: -0.55, y: -0.32, z: -1 },
+        fitOffset: 2.15,
+        fitDirection: { x: -0.55, y: -0.38, z: -1 },
         fov: 38,
       });
       if (camera?.isPerspectiveCamera) {
         camera.fov = 38;
-        camera.position.set(0.52, 0.26, 0.78);
+        camera.position.set(0.58, 0.38, 0.92);
         camera.updateProjectionMatrix();
       }
 
